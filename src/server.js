@@ -1,0 +1,10 @@
+import './config/env.js';
+import http from 'http';
+import mongoose from 'mongoose';
+import { app } from './app.js';
+import { setIo } from './services/notify.js';
+import { initSockets } from './sockets/index.js';
+await mongoose.connect(process.env.MONGODB_URI, { maxPoolSize: 20 });
+const server = http.createServer(app);
+const io = initSockets(server); app.set('io', io); setIo(io);
+server.listen(process.env.PORT || 5000, () => console.log('Order2Geda API listening'));

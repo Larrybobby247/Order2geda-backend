@@ -1,0 +1,65 @@
+// Branded, table-based, inline-styled HTML emails (render in Gmail/Outlook/Apple Mail/mobile).
+const C = { brand: '#10B981', dark: '#064E3B', mint: '#D1FAE5', gold: '#FBBF24', ink: '#17211F', muted: '#64748B', border: '#E2E8F0', bg: '#F1F5F9' };
+export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+export const money = (kobo) => '₦' + (Number(kobo || 0) / 100).toLocaleString('en-NG', { maximumFractionDigits: 2 });
+const url = (p = '/app/home') => (p.startsWith('http') ? p : (process.env.CLIENT_URL || 'https://order2geda.com') + p);
+const FONT = "font-family:Inter,'Segoe UI',Helvetica,Arial,sans-serif;";
+
+function button(label, href) {
+  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:28px auto 8px"><tr><td align="center" bgcolor="${C.brand}" style="border-radius:14px">
+  <a href="${esc(href)}" target="_blank" style="${FONT}display:inline-block;padding:15px 34px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:14px;background:${C.brand}">${esc(label)}</a></td></tr></table>
+  <p style="${FONT}margin:12px 0 0;font-size:12px;line-height:18px;color:${C.muted};text-align:center">Button not working? Paste this link into your browser:<br><a href="${esc(href)}" style="color:${C.brand};word-break:break-all">${esc(href)}</a></p>`;
+}
+function detailsCard(rows) {
+  if (!rows?.length) return '';
+  const tr = rows.map(([k, v, strong], i) => `<tr><td style="${FONT}padding:11px 0;${i ? `border-top:1px solid ${C.border};` : ''}font-size:14px;color:${C.muted}">${esc(k)}</td><td align="right" style="${FONT}padding:11px 0;${i ? `border-top:1px solid ${C.border};` : ''}font-size:${strong ? 17 : 14}px;font-weight:${strong ? 800 : 600};color:${C.ink};font-variant-numeric:tabular-nums">${esc(v)}</td></tr>`).join('');
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:24px 0 4px;background:#F8FAFC;border:1px solid ${C.border};border-radius:16px"><tr><td style="padding:6px 20px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${tr}</table></td></tr></table>`;
+}
+export function layout({ preheader = '', emoji = '🛍️', title, paragraphs = [], rows, cta, note, accent = C.brand }) {
+  const ps = paragraphs.map((p) => `<p style="${FONT}margin:0 0 14px;font-size:16px;line-height:25px;color:#334155">${p}</p>`).join('');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>${esc(title)}</title>
+<style>@media only screen and (max-width:620px){.wrap{width:100%!important}.pad{padding:28px 20px!important}h1{font-size:23px!important}}</style></head>
+<body style="margin:0;padding:0;background:${C.bg}"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${esc(preheader)}${'&zwnj;&nbsp;'.repeat(40)}</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="${C.bg}"><tr><td align="center" style="padding:28px 12px">
+<table role="presentation" class="wrap" width="600" cellspacing="0" cellpadding="0" border="0" style="width:600px;max-width:600px">
+<tr><td align="center" bgcolor="${C.dark}" style="border-radius:24px 24px 0 0;background:${C.dark};background-image:linear-gradient(135deg,${accent} 0%,${C.dark} 100%);padding:30px 24px 26px">
+ <div style="${FONT}font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#ffffff">Order<span style="color:${C.gold}">2</span>Geda</div>
+ <div style="${FONT}font-size:13px;color:#D1FAE5;margin-top:4px">Shop Together. Spend Smarter.</div></td></tr>
+<tr><td class="pad" bgcolor="#ffffff" style="background:#ffffff;padding:36px 40px 34px;border-left:1px solid ${C.border};border-right:1px solid ${C.border}">
+ <table role="presentation" align="center" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" width="64" height="64" bgcolor="${C.mint}" style="width:64px;height:64px;border-radius:32px;background:${C.mint};font-size:30px;line-height:64px">${emoji}</td></tr></table>
+ <h1 style="${FONT}margin:20px 0 16px;font-size:26px;line-height:32px;font-weight:800;color:${C.ink};text-align:center;letter-spacing:-0.4px">${esc(title)}</h1>
+ ${ps}${detailsCard(rows)}${cta ? button(cta.label, url(cta.path)) : ''}
+ ${note ? `<p style="${FONT}margin:22px 0 0;padding:14px 16px;background:#FFFBEB;border-left:4px solid ${C.gold};border-radius:8px;font-size:13px;line-height:20px;color:#78350F">${note}</p>` : ''}</td></tr>
+<tr><td bgcolor="#ffffff" style="background:#ffffff;border:1px solid ${C.border};border-top:0;border-radius:0 0 24px 24px;padding:0 40px 28px"><table role="presentation" width="100%"><tr><td style="border-top:1px solid ${C.border};padding-top:20px;${FONT}font-size:12px;line-height:19px;color:${C.muted};text-align:center">
+ <a href="${url('/app/settings')}" style="color:${C.muted}">Notification settings</a> &nbsp;•&nbsp; <a href="${url('/help')}" style="color:${C.muted}">Help</a> &nbsp;•&nbsp; <a href="${url('/terms')}" style="color:${C.muted}">Terms</a> &nbsp;•&nbsp; <a href="${url('/privacy')}" style="color:${C.muted}">Privacy</a><br>
+ You are receiving this email because you have an Order2Geda account or were invited to one.<br>© ${new Date().getFullYear()} Order2Geda · order2geda.com · Nigeria</td></tr></table></td></tr>
+</table></td></tr></table></body></html>`;
+}
+const hi = (d) => `Hi ${esc(String(d.name || 'there').split(' ')[0])},`;
+const T = {
+  verifyEmail: (d) => ({ subject: 'Welcome to Order2Geda — verify your email', preheader: 'One tap to confirm your email and start shopping together.', emoji: '👋', title: 'Welcome to Order2Geda!',
+    paragraphs: [hi(d), 'You can now join shopping rooms, combine orders with other shoppers and reach minimum-purchase targets together. First, please confirm your email address.'], cta: { label: 'Verify my email', path: d.path }, note: 'If you did not create this account, you can safely ignore this email.' }),
+  passwordReset: (d) => ({ subject: 'Reset your Order2Geda password', preheader: 'This link expires in 1 hour.', emoji: '🔐', title: 'Reset your password', paragraphs: [hi(d), 'We received a request to reset your password. Use the button below to choose a new one. For your security this link works once and expires in 1 hour.'], cta: { label: 'Choose a new password', path: d.path }, note: 'Did not request this? Ignore this email — your password stays the same.' }),
+  moderatorInvitation: (d) => ({ subject: "You're invited to moderate on Order2Geda", preheader: 'Accept your moderator invitation.', emoji: '🛡️', title: 'You have been invited as a moderator', accent: C.dark,
+    paragraphs: ['Order2Geda administrators have invited you to manage shopping rooms, verify products and coordinate bulk orders.', `This invitation is single-use and expires in ${esc(d.days || 3)} days. You must sign up or log in with <b>${esc(d.email)}</b> to accept.`], cta: { label: 'Accept invitation', path: d.path }, note: 'Only accept if you were expecting this invitation.' }),
+  roomInvitation: (d) => ({ subject: `${d.inviter || 'A friend'} invited you to a private shopping room`, preheader: d.room, emoji: '🎟️', title: 'You are invited to a private room', paragraphs: [hi(d), `${esc(d.inviter || 'A friend')} invited you to join <b>${esc(d.room)}</b>. Joining does not mean you have paid.`], rows: [['Room', d.room], ['Platform', d.platform]].filter((r) => r[1]), cta: { label: 'View invitation', path: d.path } }),
+  paymentConfirmation: (d) => ({ subject: `Payment received — ${d.reference}`, preheader: `We received your payment of ${money(d.amount)}.`, emoji: '✅', title: 'Payment successful', paragraphs: [hi(d), `Thank you! Your payment${d.room ? ` for <b>${esc(d.room)}</b>` : ''} has been confirmed. The moderator will now include your items in the group's bulk order.`],
+    rows: [['Order reference', d.reference], ['Products', money(d.subtotal)], ['Service commission', money(d.commission)], ['Shared shipping', money(d.shipping)], ['Total paid', money(d.amount), true]], cta: { label: 'Track my order', path: d.path || '/app/orders' } }),
+  roomClosed: (d) => ({ subject: `${d.room} is full — time to pay`, preheader: 'Your room reached its closing threshold.', emoji: '🎉', title: 'Your room has closed', paragraphs: [hi(d), `<b>${esc(d.room)}</b> reached its target. Review your order and pay to secure your items in the bulk order.`], cta: { label: 'Review & pay', path: d.path || '/app/orders' } }),
+  orderUpdate: (d) => ({ subject: `Order update — ${d.status}`, preheader: `${d.reference}: ${d.status}`, emoji: '📦', title: d.status, paragraphs: [hi(d), 'There is a new update on your group order.'], rows: [['Order reference', d.reference], ['Status', d.status, true]], cta: { label: 'View tracking', path: d.path || '/app/orders' } }),
+  refund: (d) => {
+    const m = { REQUESTED: ['Refund request received', '🧾', 'We received your refund request and an administrator will review it shortly.'], APPROVED: ['Refund approved', '👍', 'Your refund has been approved. We will transfer it to your bank account and confirm once it is sent.'],
+      REJECTED: ['Refund request declined', '⚠️', `Your refund request was not approved.${d.reason ? ' Reason: ' + esc(d.reason) : ''}`], COMPLETED: ['Refund completed', '💸', 'Your refund has been transferred. Your entire individual order has been cancelled and removed from the group\'s bulk order. Other participants are not affected.'] }[d.status] || ['Refund update', '🧾', 'There is an update on your refund.'];
+    return { subject: `${m[0]}${d.reference ? ' — ' + d.reference : ''}`, preheader: m[0], emoji: m[1], title: m[0], paragraphs: [hi(d), m[2]], rows: [d.reference && ['Order reference', d.reference], d.amount && ['Refund amount', money(d.amount), true], d.transfer && ['Transfer reference', d.transfer]].filter(Boolean), cta: { label: 'View my orders', path: '/app/orders' } };
+  },
+  referralReward: (d) => ({ subject: `You earned ${money(d.amount)}!`, preheader: 'A referral reward was added to your wallet.', emoji: '🎁', title: `You earned ${money(d.amount)}`, paragraphs: [hi(d), 'A friend you referred completed their first paid order. Your reward is now in your Order2Geda wallet.'], cta: { label: 'View my wallet', path: '/app/wallet' } }),
+  compensation: (d) => ({ subject: d.status === 'PAID' ? 'Your moderator payout was sent' : 'Your moderator compensation was approved', preheader: money(d.amount), emoji: d.status === 'PAID' ? '💰' : '✔️', title: d.status === 'PAID' ? 'Payout sent' : 'Compensation approved', accent: C.dark, paragraphs: [hi(d), d.status === 'PAID' ? 'Your compensation has been paid out.' : 'An administrator approved your compensation. Payout will be made manually.'],
+    rows: [d.room && ['Room', d.room], ['Amount', money(d.amount), true], d.payoutReference && ['Payout reference', d.payoutReference]].filter(Boolean), cta: { label: 'View earnings', path: '/moderator/earnings' } }),
+  notification: (d) => ({ subject: d.title, preheader: d.body, emoji: '🔔', title: d.title, paragraphs: [hi(d), esc(d.body)], cta: d.path ? { label: d.ctaLabel || 'Open Order2Geda', path: d.path } : { label: 'Open Order2Geda', path: '/app/home' } }),
+};
+export function render(template, data = {}) {
+  const spec = (T[template] || T.notification)(data); const html = layout(spec);
+  const text = [spec.title, '', ...spec.paragraphs.map((p) => p.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&')), '', ...(spec.rows || []).map(([k, v]) => `${k}: ${v}`), spec.cta ? `\n${spec.cta.label}: ${url(spec.cta.path)}` : '', '\n— Order2Geda'].join('\n');
+  return { subject: spec.subject, html, text };
+}
+export const TEMPLATE_NAMES = Object.keys(T);

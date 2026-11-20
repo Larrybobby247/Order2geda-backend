@@ -1,0 +1,29 @@
+{
+ "name": "order2geda-server",
+ "type": "module",
+ "scripts": {
+  "dev": "node --env-file=.env --watch src/server.js",
+  "start": "node --env-file=.env src/server.js",
+  "seed:admin": "node --env-file=.env src/seed-admin.js",
+  "test": "node --test src/",
+  "emails:preview": "node src/emails-preview.js"
+ },
+ "dependencies": {
+  "bcryptjs": "^2.4.3",
+  "@socket.io/redis-adapter": "^8.3.0",
+  "bullmq": "^5.12.0",
+  "ioredis": "^5.4.1",
+  "cors": "^2.8.5",
+  "express": "^4.19.2",
+  "express-rate-limit": "^7.4.0",
+  "helmet": "^7.1.0",
+  "jsonwebtoken": "^9.0.2",
+  "mongoose": "^8.5.0",
+  "socket.io": "^4.7.5",
+  "zod": "^3.23.8"
+ },
+ "optionalDependencies": {
+  "firebase-admin": "^12.3.0",
+  "@sentry/node": "^8.26.0"
+ }
+}
