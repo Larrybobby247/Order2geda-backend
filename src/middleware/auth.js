@@ -5,7 +5,7 @@ export async function requireAuth(req, res, next) {
   try {
     const p = jwt.verify((req.headers.authorization || '').replace('Bearer ', ''), process.env.JWT_SECRET);
     const u = await User.findById(p.id).select('-passwordHash -totpSecret -verifyTokenHash -resetTokenHash');
-    if (!u || u.accountStatus !== 'ACTIVE') return res.status(401).json({ error: 'Unauthorized' });
+    if (!u || u.accountStatus !== 'ACTIVE' || (u.passwordChangedAt && (p.iat + 1) * 1000 <= u.passwordChangedAt.getTime())) return res.status(401).json({ error: 'Unauthorized' });
     req.user = u; next();
   } catch { res.status(401).json({ error: 'Unauthorized' }); }
 }
