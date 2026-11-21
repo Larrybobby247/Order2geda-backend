@@ -1,5 +1,6 @@
 import { Room, Product, Message } from '../models/index.js';
 import { notify } from './notify.js';
+import { buildCheckout } from './orderService.js';
 // Atomic add: succeeds only while OPEN and joined; then idempotently closes at threshold.
 export async function addProducts(roomId, userId, items, io) {
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -15,7 +16,14 @@ export async function addProducts(roomId, userId, items, io) {
 async function onClosed(room, io) { // chat announcement + closed-room emails/notifications (failures never affect closure)
   const m = await Message.create({ room: room._id, content: 'The room has reached its closing threshold and is now closed. Review your order and pay.', messageType: 'SYSTEM' });
   io?.to(`room:${room._id}`).emit('message:new', m);
-  for (const uid of room.participants) notify(uid, 'room', 'Room closed', `${room.name} has closed. Review and pay for your order.`, { kind: 'Room', id: room._id }, io, { template: 'roomClosed', data: { room: room.name, path: '/app/orders' } });
+  for (const uid of room.participants) { // create every participant's order now so they can pay immediately, and email the exact total
+    try {
+      if (!(await Product.exists({ room: room._id, customer: uid, status: 'ACTIVE' }))) continue; // joined but added nothing: nothing to pay
+      const order = await buildCheckout(room._id, { _id: uid });
+      notify(uid, 'payment', 'Room closed — pay now', `${room.name} has closed. Your total is ready to pay.`, { kind: 'Order', id: order._id }, io,
+        { template: 'payNow', data: { room: room.name, subtotal: order.productSubtotal, commission: order.commissionAmount, shipping: order.estimatedShipping, amount: order.totalAmount, path: `/app/pay/${order._id}` } });
+    } catch (e) { console.error('close checkout', String(uid), e.message); }
+  }
   if (room.assignedModerator) notify(room.assignedModerator, 'room', 'Room closed', `${room.name} has reached its threshold.`, { kind: 'Room', id: room._id }, io);
 }
 export async function adjustTotal(roomId, delta, io) {
