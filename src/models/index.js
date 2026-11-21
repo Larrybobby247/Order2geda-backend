@@ -6,7 +6,7 @@ export const User = model('User', new Schema({
   phone:String, passwordHash:{type:String,required:true}, profileImage:String,
   role:{type:String,enum:['CUSTOMER','MODERATOR','ADMIN'],default:'CUSTOMER',index:true},
   emailVerified:{type:Boolean,default:false}, accountStatus:{type:String,enum:['ACTIVE','SUSPENDED'],default:'ACTIVE'},
-  referralCode:{type:String,unique:true}, referredBy:{type:oid,ref:'User'}, maxActiveRooms:{type:Number,default:5}, verifyTokenHash:String, fcmTokens:[String], totpSecret:String, totpEnabled:{type:Boolean,default:false}, resetTokenHash:String, resetExpiresAt:Date,
+  referralCode:{type:String,unique:true}, referredBy:{type:oid,ref:'User'}, maxActiveRooms:{type:Number,default:5}, verifyTokenHash:String, fcmTokens:[String], passwordChangedAt:Date, deliveryAddress:{recipientName:String,phone:String,line1:String,city:String,state:String,landmark:String}, totpSecret:String, totpEnabled:{type:Boolean,default:false}, resetTokenHash:String, resetExpiresAt:Date,
   notificationPreferences:{type:Object,default:{email:true,push:true,chatEmail:false}}
 }, t));
 const roomSchema = new Schema({
