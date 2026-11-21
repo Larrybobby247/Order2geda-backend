@@ -12,15 +12,17 @@ import messages from './routes/messages.js';
 import uploads from './routes/uploads.js';
 import mongoose from 'mongoose';
 import { metricsMiddleware } from './services/metrics.js';
+import publicRoutes from './routes/public.js';
 import webhook from './routes/webhook.js';
 const sentry = process.env.SENTRY_DSN ? await import('@sentry/node').then((m) => (m.init({ dsn: process.env.SENTRY_DSN, tracesSampleRate: 0.1, sendDefaultPii: false }), m)).catch(() => null) : null;
 export const app = express();
+app.set('trust proxy', 1); // correct client IPs for rate limiting behind Render/Railway/Nginx
 app.use(metricsMiddleware); app.use(helmet()); app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use('/api/webhooks', express.raw({ type: '*/*' }), webhook);
 app.use(express.json({ limit: '1mb' }));
 app.use('/api', rateLimit({ windowMs: 60000, limit: 300 }));
 app.use('/api/auth', rateLimit({ windowMs: 60000, limit: 20 }), auth);
-app.use('/api/me', me); app.use('/api/messages', messages); app.use('/api/uploads', uploads); app.use('/api/rooms', rooms); app.use('/api/orders', orders); app.use('/api/admin', admin); app.use('/api/moderator', moderator);
+app.use('/api/public', publicRoutes); app.use('/api/me', me); app.use('/api/messages', messages); app.use('/api/uploads', uploads); app.use('/api/rooms', rooms); app.use('/api/orders', orders); app.use('/api/admin', admin); app.use('/api/moderator', moderator);
 app.get('/health', (_, res) => (mongoose.connection.readyState === 1 ? res.json({ ok: true }) : res.status(503).json({ ok: false })));
 app.use((err, req, res, _n) => {
   if (err.name === 'ZodError') return res.status(400).json({ error: 'Validation failed', details: err.issues });
