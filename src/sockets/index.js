@@ -22,7 +22,7 @@ export function initSockets(httpServer) {
       if (!s.rooms.has(`room:${roomId}`) || (!content.trim() && !atts.length) || content.length > 2000) return ack?.({ error: 'invalid' });
       if (replyTo && !(await Message.exists({ _id: replyTo, room: roomId }))) replyTo = undefined;
       const m = await Message.create({ room: roomId, sender: s.user.id, content: content.trim(), replyTo, attachments: atts }); // persist before broadcast
-      await m.populate([{ path: 'sender', select: 'fullName profileImage role' }, { path: 'replyTo', select: 'content' }]);
+      await m.populate([{ path: 'sender', select: 'fullName profileImage role' }, { path: 'replyTo', select: 'content sender', populate: { path: 'sender', select: 'fullName' } }]);
       io.to(`room:${roomId}`).emit('message:new', m); ack?.({ ok: true, id: m._id });
     });
   });
