@@ -16,6 +16,7 @@ r.get('/', wrap(async (req, res) => {
   const { q, platform, status = 'OPEN', sort = 'new', page = 1 } = req.query;
   const f = { visibility: 'PUBLIC', status }; // private rooms never listed
   if (platform) f.shoppingPlatform = platform;
+  if (req.query.category) f.category = String(req.query.category);
   if (q) f.name = new RegExp(String(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
   const rooms = await cached('rooms:' + JSON.stringify(req.query), 15, () => Room.find(f).select(pub).sort(sort === 'progress' ? { acceptedProductTotal: -1 } : { createdAt: -1 }).skip((page - 1) * 20).limit(20).lean());
   res.json(rooms.map((x) => ({ ...x, participantCount: x.participants.length, participants: undefined })));

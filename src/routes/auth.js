@@ -49,6 +49,11 @@ r.post('/reset-password', wrap(async (req, res) => {
   const u = await User.findOneAndUpdate({ resetTokenHash: sha(req.body.token), resetExpiresAt: { $gt: new Date() } }, { passwordHash: await bcrypt.hash(req.body.password, 12), $unset: { resetTokenHash: 1, resetExpiresAt: 1 } });
   u ? res.json({ ok: true }) : res.status(400).json({ error: 'Invalid or expired link' });
 }));
+r.post('/resend-verification', requireAuth, wrap(async (req, res) => {
+  if (req.user.emailVerified) return res.json({ already: true });
+  const vt = crypto.randomBytes(24).toString('hex'); await User.updateOne({ _id: req.user._id }, { verifyTokenHash: sha(vt) });
+  sendTemplate(req.user.email, 'verifyEmail', { name: req.user.fullName, path: `/verify-email/${vt}` }); res.json({ sent: true });
+}));
 const staff = (req, res, next) => (req.user.role === 'CUSTOMER' ? res.status(403).json({ error: 'Forbidden' }) : next());
 r.post('/2fa/setup', requireAuth, staff, wrap(async (req, res) => { const secret = newSecret(); await User.updateOne({ _id: req.user._id }, { totpSecret: encrypt(secret), totpEnabled: false }); res.json({ secret, otpauthUrl: otpauth(req.user.email, secret) }); }));
 r.post('/2fa/enable', requireAuth, staff, wrap(async (req, res) => {
