@@ -85,7 +85,7 @@ r.get('/:id/messages', requireAuth, wrap(async (req, res) => {
   const room = await Room.findOne({ _id: req.params.id, $or: [{ participants: req.user._id }, { assignedModerator: req.user._id }] }).select('_id');
   if (!room) return res.status(403).json({ error: 'Not a member' });
   const f = { room: room._id, deletedAt: null }; if (req.query.before) f.createdAt = { $lt: new Date(req.query.before) };
-  res.json((await Message.find(f).sort({ createdAt: -1 }).limit(40).populate('sender', 'fullName profileImage role').populate('replyTo', 'content').lean()).reverse());
+  res.json((await Message.find(f).sort({ createdAt: -1 }).limit(40).populate('sender', 'fullName profileImage role').populate({ path: 'replyTo', select: 'content sender', populate: { path: 'sender', select: 'fullName' } }).lean()).reverse());
 }));
 r.get('/:id/members', requireAuth, wrap(async (req, res) => {
   const room = await Room.findOne({ _id: req.params.id, $or: [{ participants: req.user._id }, { assignedModerator: req.user._id }, ...(req.user.role === 'ADMIN' ? [{}] : [])] }).populate('participants', 'fullName profileImage').populate('assignedModerator', 'fullName').lean();

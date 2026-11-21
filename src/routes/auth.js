@@ -46,7 +46,7 @@ r.post('/forgot-password', wrap(async (req, res) => { // same response whether o
 }));
 r.post('/reset-password', wrap(async (req, res) => {
   z.string().min(8).parse(req.body.password);
-  const u = await User.findOneAndUpdate({ resetTokenHash: sha(req.body.token), resetExpiresAt: { $gt: new Date() } }, { passwordHash: await bcrypt.hash(req.body.password, 12), $unset: { resetTokenHash: 1, resetExpiresAt: 1 } });
+  const u = await User.findOneAndUpdate({ resetTokenHash: sha(req.body.token), resetExpiresAt: { $gt: new Date() } }, { passwordHash: await bcrypt.hash(req.body.password, 12), passwordChangedAt: new Date(), $unset: { resetTokenHash: 1, resetExpiresAt: 1 } });
   u ? res.json({ ok: true }) : res.status(400).json({ error: 'Invalid or expired link' });
 }));
 r.post('/resend-verification', requireAuth, wrap(async (req, res) => {

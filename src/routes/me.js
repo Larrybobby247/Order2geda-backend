@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { Notification, Wallet, WalletTransaction, Referral, User, Setting } from '../models/index.js';
-import { requireAuth, wrap } from '../middleware/auth.js';
+import { z } from 'zod';
+import bcrypt from 'bcryptjs';
+import { requireAuth, wrap, sign } from '../middleware/auth.js';
 const r = Router(); r.use(requireAuth);
 r.get('/notifications', wrap(async (req, res) => {
   const f = { recipient: req.user._id, ...(req.query.unread && { readAt: null }) };
@@ -29,4 +31,18 @@ r.patch('/preferences', wrap(async (req, res) => {
   await User.updateOne({ _id: req.user._id }, { notificationPreferences: { email: email !== false, push: push !== false, chatEmail: !!chatEmail } }); res.json({ ok: true });
 }));
 r.post('/push-token', wrap(async (req, res) => { await User.updateOne({ _id: req.user._id }, { $addToSet: { fcmTokens: String(req.body.token) } }); res.json({ ok: true }); }));
+const SAFE = '-passwordHash -totpSecret -verifyTokenHash -resetTokenHash';
+const addr = z.object({ recipientName: z.string().max(80), phone: z.string().max(20), line1: z.string().max(200), city: z.string().max(80), state: z.string().max(60), landmark: z.string().max(120) }).partial();
+r.patch('/profile', wrap(async (req, res) => {
+  const d = z.object({ fullName: z.string().trim().min(2).max(80).optional(), phone: z.string().trim().min(7).max(20).optional(),
+    profileImage: z.string().url().startsWith('https://res.cloudinary.com/').optional(), deliveryAddress: addr.optional() }).parse(req.body);
+  res.json(await User.findByIdAndUpdate(req.user._id, { $set: d }, { new: true }).select(SAFE)); // email is not editable here
+}));
+r.post('/change-password', wrap(async (req, res) => {
+  const { currentPassword, newPassword } = z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(8).max(100) }).parse(req.body);
+  const u = await User.findById(req.user._id);
+  if (!(await bcrypt.compare(currentPassword, u.passwordHash))) return res.status(400).json({ error: 'Your current password is incorrect' });
+  u.passwordHash = await bcrypt.hash(newPassword, 12); u.passwordChangedAt = new Date(); await u.save(); // revokes every older login token
+  res.json({ token: sign(u) });
+}));
 export default r;

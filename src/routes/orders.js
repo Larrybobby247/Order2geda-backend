@@ -17,8 +17,15 @@ r.post('/payments/verify', requireAuth, wrap(async (req, res) => {
   const p = await Payment.findOne({ providerReference: req.body.reference, customer: req.user._id });
   res.json({ status: p?.status || 'UNKNOWN' }); // status from our DB only
 }));
+// Unpaid orders are re-priced from the current verified products before being shown, so the amount a customer sees is the amount they pay.
+async function loadOrder(filter, user) {
+  const o = await Order.findOne(filter); if (!o) return null;
+  if (o.paymentStatus === 'UNPAID' && o.orderStatus !== 'CANCELLED') await buildCheckout(o.room, user).catch(() => {});
+  return Order.findById(o._id).populate('products').lean();
+}
+r.get('/room/:roomId', requireAuth, wrap(async (req, res) => res.json(await loadOrder({ room: req.params.roomId, customer: req.user._id }, req.user))));
 r.get('/:id', requireAuth, wrap(async (req, res) => {
-  const o = await Order.findOne({ _id: req.params.id, customer: req.user._id }).populate('products').lean();
+  const o = await loadOrder({ _id: req.params.id, customer: req.user._id }, req.user);
   o ? res.json(o) : res.status(404).json({ error: 'Not found' });
 }));
 r.get('/:id/tracking', requireAuth, wrap(async (req, res) => {
@@ -26,9 +33,12 @@ r.get('/:id/tracking', requireAuth, wrap(async (req, res) => {
   o ? res.json(o) : res.status(404).json({ error: 'Not found' });
 }));
 r.post('/:id/pay', requireAuth, requireVerified, wrap(async (req, res) => {
-  const o = await Order.findOne({ _id: req.params.id, customer: req.user._id });
+  if (req.body?.acceptPolicies !== true) return res.status(400).json({ error: 'You must accept the purchasing, shipping and refund policies' });
+  let o = await Order.findOne({ _id: req.params.id, customer: req.user._id });
   if (!o || o.orderStatus === 'CANCELLED') return res.status(404).json({ error: 'Not found' });
   if (o.paymentStatus === 'PAID') return res.status(409).json({ error: 'Already paid' });
+  o = await buildCheckout(o.room, req.user); // refresh amounts from verified products
+  if (!o.totalAmount) return res.status(409).json({ error: 'There is nothing to pay for this order' });
   const reference = 'O2G-PAY-' + crypto.randomBytes(8).toString('hex');
   await Payment.create({ customer: req.user._id, order: o._id, providerReference: reference, amount: o.totalAmount, commissionAmount: o.commissionAmount, shippingAmount: o.estimatedShipping });
   const ps = await paystack.initialize(req.user.email, o.totalAmount, reference, `${process.env.CLIENT_URL}/app/payment/success`);
