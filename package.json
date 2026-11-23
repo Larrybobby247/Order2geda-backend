@@ -2,8 +2,8 @@
  "name": "order2geda-server",
  "type": "module",
  "scripts": {
-  "dev": "node --env-file=.env --watch src/server.js",
-  "start": "node --env-file=.env src/server.js",
+"dev": "node --env-file=.env --watch src/server.js",
+"start": "node src/server.js"
   "seed:admin": "node --env-file=.env src/seed-admin.js",
   "test": "node --test --test-concurrency=1 src/*.test.js",
   "emails:preview": "node src/emails-preview.js",
