@@ -29,25 +29,22 @@ r.post('/rooms/:roomId/bulk-order/place', own, wrap(async (req, res) => {
   const orders = await Order.find({ room: req.params.roomId, paymentStatus: 'PAID', orderStatus: { $ne: 'CANCELLED' } });
   const bulk = await BulkOrder.findOneAndUpdate({ room: req.params.roomId }, { assignedModerator: req.user._id, customerOrders: orders.map((o) => o._id), externalPlatform, externalOrderReference, externalShipping,
     totalProductValue: orders.reduce((s, o) => s + o.productSubtotal, 0), bulkOrderStatus: 'ORDER_PLACED', placedAt: new Date() }, { upsert: true, new: true });
-  await Order.updateMany({ _id: { $in: bulk.customerOrders } }, { orderStatus: 'ORDER_PLACED' });
   await Room.updateOne({ _id: req.params.roomId }, { status: 'PROCESSING' });
   orders.forEach((o) => notify(o.customer, 'order', 'Bulk order placed', `Your order ${o.orderReference} has been placed.`, { kind: 'Order', id: o._id }));
   res.json(bulk);
 }));
-// Moves every non-cancelled paid order in the room forward; cancelled orders are never touched.
+// Room-level logistics stage (bulk order -> shipped -> customs -> arrived). Buyers' order statuses are NOT changed here: they follow the shipping-fee workflow.
 r.patch('/rooms/:roomId/status', own, wrap(async (req, res) => {
   const { status } = req.body; const bulk = await BulkOrder.findOne({ room: req.params.roomId });
   if (!bulk) return res.status(409).json({ error: 'Place the bulk order first' });
   const from = FLOW.indexOf(bulk.bulkOrderStatus), to = FLOW.indexOf(status);
   if (to < 0 || to <= from) return res.status(400).json({ error: 'Invalid status transition' });
   bulk.bulkOrderStatus = status; await bulk.save();
-  await Order.updateMany({ _id: { $in: bulk.customerOrders }, orderStatus: { $ne: 'CANCELLED' } }, { orderStatus: status });
   const orders = await Order.find({ _id: { $in: bulk.customerOrders }, orderStatus: { $ne: 'CANCELLED' } }).select('customer orderReference');
-  orders.forEach((o) => { req.app.get('io')?.to(`user:${o.customer}`).emit('order:updated', { orderId: o._id, status }); notify(o.customer, 'order', 'Order update', `${o.orderReference}: ${status.replace(/_/g, ' ').toLowerCase()}`, { kind: 'Order', id: o._id }); });
-  if (status === 'COMPLETED') await Room.updateOne({ _id: req.params.roomId }, { status: 'COMPLETED' });
+  orders.forEach((o) => { req.app.get('io')?.to(`user:${o.customer}`).emit('order:updated', { orderId: o._id, bulkStatus: status }); notify(o.customer, 'order', 'Order update', `${o.orderReference}: group order ${status.replace(/_/g, ' ').toLowerCase()}`, { kind: 'Order', id: o._id }); });
   res.json({ status });
 }));
 r.get('/rooms/:roomId', own, wrap(async (req, res) => res.json(await Room.findById(req.params.roomId).populate('participants', 'fullName').lean())));
-r.get('/rooms/:roomId/products', own, wrap(async (req, res) => res.json(await Product.find({ room: req.params.roomId }).populate('customer', 'fullName').sort({ customer: 1 }).lean())));
+r.get('/rooms/:roomId/products', own, wrap(async (req, res) => res.json(await Product.find({ room: req.params.roomId, locked: true }).populate('customer', 'fullName').sort({ customer: 1 }).lean())));
 r.get('/earnings', wrap(async (req, res) => res.json(await ModeratorCompensation.find({ moderator: req.user._id }).lean())));
 export default r;

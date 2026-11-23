@@ -6,19 +6,20 @@ import { resolveRule } from '../services/compensation.js';
 import { snapshot } from '../services/metrics.js';
 import { queueStats } from '../services/notify.js';
 import { decrypt } from '../utils/crypto.js';
-import { CompensationRule, Referral, Wallet, WalletTransaction, User, Room, Order, Payment, Refund, Setting, ModeratorInvitation, ModeratorAssignment, ModeratorCompensation } from '../models/index.js';
+import { ShippingInvoice, CompensationRule, Referral, Wallet, WalletTransaction, User, Room, Order, Payment, Refund, Setting, ModeratorInvitation, ModeratorAssignment, ModeratorCompensation } from '../models/index.js';
 import { requireAuth, requireRole, wrap } from '../middleware/auth.js';
-import { completeRefund, allocateShipping } from '../services/orderService.js';
+import { completeRefund } from '../services/orderService.js';
 import { notify, sendTemplate } from '../services/notify.js';
 import { audit } from '../services/audit.js';
 import { pct } from '../utils/money.js';
 const r = Router(); r.use(requireAuth, requireRole('ADMIN'));
 r.get('/dashboard', wrap(async (req, res) => {
+  const ship = await ShippingInvoice.aggregate([{ $match: { status: { $in: ['PUBLISHED', 'PAID'] } } }, { $group: { _id: '$status', t: { $sum: '$amount' } } }]);
   const [customers, activeRooms, orders, rev, pendingRefunds] = await Promise.all([
     User.countDocuments({ role: 'CUSTOMER' }), Room.countDocuments({ status: 'OPEN' }), Order.countDocuments(),
     Order.aggregate([{ $match: { paymentStatus: 'PAID' } }, { $group: { _id: null, gross: { $sum: '$productSubtotal' }, commission: { $sum: '$commissionAmount' } } }]),
     Refund.countDocuments({ status: 'PENDING' })]);
-  res.json({ customers, activeRooms, orders, gross: rev[0]?.gross || 0, commission: rev[0]?.commission || 0, pendingRefunds });
+  res.json({ customers, activeRooms, orders, gross: rev[0]?.gross || 0, commission: rev[0]?.commission || 0, pendingRefunds, shippingReceived: ship.find((x) => x._id === 'PAID')?.t || 0, shippingOutstanding: ship.find((x) => x._id === 'PUBLISHED')?.t || 0 });
 }));
 r.get('/users', wrap(async (req, res) => res.json(await User.find().select('-passwordHash -totpSecret -verifyTokenHash -resetTokenHash').sort({ createdAt: -1 }).limit(100).lean())));
 r.patch('/users/:id/status', wrap(async (req, res) => {
@@ -57,7 +58,6 @@ r.patch('/refunds/:id/status', wrap(async (req, res) => {
   if (status !== 'PROCESSING') { const o = await Order.findById(rf.order).select('orderReference'); notify(rf.customer, 'refund', 'Refund ' + status.toLowerCase(), 'Your refund request was ' + status.toLowerCase() + '.', { kind: 'Order', id: rf.order }, undefined, { template: 'refund', data: { status, reference: o?.orderReference, amount: rf.requestedAmount, reason: req.body.reason } }); }
   res.json(rf);
 }));
-r.post('/rooms/:id/shipping', wrap(async (req, res) => { await allocateShipping(req.params.id, Number(req.body.totalShipping)); res.json({ ok: true }); }));
 r.put('/settings/:key', wrap(async (req, res) => {
   await Setting.findOneAndUpdate({ key: req.params.key }, { value: req.body.value }, { upsert: true }); await audit(req.user, 'SETTING', 'Setting', undefined, null, { [req.params.key]: req.body.value }); res.json({ ok: true });
 }));

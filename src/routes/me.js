@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Notification, Wallet, WalletTransaction, Referral, User, Setting } from '../models/index.js';
 import { z } from 'zod';
+import { canonState } from '../utils/locations.js';
 import bcrypt from 'bcryptjs';
 import { requireAuth, wrap, sign } from '../middleware/auth.js';
 const r = Router(); r.use(requireAuth);
@@ -35,7 +36,8 @@ const SAFE = '-passwordHash -totpSecret -verifyTokenHash -resetTokenHash';
 const addr = z.object({ recipientName: z.string().max(80), phone: z.string().max(20), line1: z.string().max(200), city: z.string().max(80), state: z.string().max(60), landmark: z.string().max(120) }).partial();
 r.patch('/profile', wrap(async (req, res) => {
   const d = z.object({ fullName: z.string().trim().min(2).max(80).optional(), phone: z.string().trim().min(7).max(20).optional(),
-    profileImage: z.string().url().startsWith('https://res.cloudinary.com/').optional(), deliveryAddress: addr.optional() }).parse(req.body);
+    profileImage: z.string().url().startsWith('https://res.cloudinary.com/').optional(), deliveryAddress: addr.optional(), location: z.object({ state: z.string(), area: z.string().trim().max(60) }).optional() }).parse(req.body);
+  if (d.location) { const st = canonState(d.location.state); if (!st) return res.status(400).json({ error: 'Choose a valid Nigerian state' }); d.location = { state: st, area: d.location.area }; }
   res.json(await User.findByIdAndUpdate(req.user._id, { $set: d }, { new: true }).select(SAFE)); // email is not editable here
 }));
 r.post('/change-password', wrap(async (req, res) => {
