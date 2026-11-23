@@ -6,7 +6,7 @@ export const User = model('User', new Schema({
   phone:String, passwordHash:{type:String,required:true}, profileImage:String,
   role:{type:String,enum:['CUSTOMER','MODERATOR','ADMIN'],default:'CUSTOMER',index:true},
   emailVerified:{type:Boolean,default:false}, accountStatus:{type:String,enum:['ACTIVE','SUSPENDED'],default:'ACTIVE'},
-  referralCode:{type:String,unique:true}, referredBy:{type:oid,ref:'User'}, maxActiveRooms:{type:Number,default:5}, verifyTokenHash:String, fcmTokens:[String], passwordChangedAt:Date, deliveryAddress:{recipientName:String,phone:String,line1:String,city:String,state:String,landmark:String}, totpSecret:String, totpEnabled:{type:Boolean,default:false}, resetTokenHash:String, resetExpiresAt:Date,
+  referralCode:{type:String,unique:true}, referredBy:{type:oid,ref:'User'}, maxActiveRooms:{type:Number,default:5}, verifyTokenHash:String, fcmTokens:[String], location:{state:String,area:String}, passwordChangedAt:Date, deliveryAddress:{recipientName:String,phone:String,line1:String,city:String,state:String,landmark:String}, totpSecret:String, totpEnabled:{type:Boolean,default:false}, resetTokenHash:String, resetExpiresAt:Date,
   notificationPreferences:{type:Object,default:{email:true,push:true,chatEmail:false}}
 }, t));
 const roomSchema = new Schema({
@@ -15,17 +15,17 @@ const roomSchema = new Schema({
   invitationTokenHash:{type:String,index:true}, invitationExpiresAt:Date,
   targetAmount:{type:Number,required:true}, bufferPercentage:{type:Number,default:5},
   closingThreshold:{type:Number,required:true}, acceptedProductTotal:{type:Number,default:0},
-  participants:[{type:oid,ref:'User'}], assignedModerator:{type:oid,ref:'User'},
+  participants:[{type:oid,ref:'User'}], assignedModerator:{type:oid,ref:'User'}, state:String, area:String, stateKey:{type:String,index:true}, areaKey:String, lockSeq:{type:Number,default:0},
   status:{type:String,enum:['OPEN','CLOSED','PROCESSING','COMPLETED','CANCELLED'],default:'OPEN'}, deadline:Date, closedAt:Date
 }, t);
-roomSchema.index({visibility:1,status:1,createdAt:-1});
+roomSchema.index({visibility:1,status:1,createdAt:-1}); roomSchema.index({visibility:1,status:1,stateKey:1,areaKey:1});
 export const Room = model('Room', roomSchema);
 export const Product = model('Product', new Schema({
   room:{type:oid,ref:'Room',index:true}, customer:{type:oid,ref:'User',index:true},
   name:{type:String,required:true}, price:{type:Number,required:true,min:1}, quantity:{type:Number,required:true,min:1},
   image:String, productUrl:String, category:String, size:String, colour:String, description:String, instructions:String,
   verificationStatus:{type:String,enum:['PENDING','VERIFIED','FLAGGED','UNAVAILABLE'],default:'PENDING'},
-  moderatorNotes:String, status:{type:String,enum:['ACTIVE','CANCELLED'],default:'ACTIVE'}
+  moderatorNotes:String, status:{type:String,enum:['ACTIVE','CANCELLED'],default:'ACTIVE'}, locked:{type:Boolean,default:false}, order:{type:oid,ref:'Order'}
 }, t));
 const orderSchema = new Schema({
   orderReference:{type:String,unique:true}, room:{type:oid,ref:'Room',index:true}, customer:{type:oid,ref:'User',index:true},
@@ -34,9 +34,9 @@ const orderSchema = new Schema({
   walletCreditUsed:{type:Number,default:0}, totalAmount:Number, paidAmount:{type:Number,default:0},
   paymentStatus:{type:String,enum:['UNPAID','PAID','FAILED'],default:'UNPAID'},
   orderStatus:{type:String,default:'AWAITING_PAYMENT'}, refundStatus:{type:String,default:'NONE'},
-  cancelledAt:Date, cancellationReason:String, flaggedForAdmin:{type:Boolean,default:false}
+  cancelledAt:Date, cancellationReason:String, flaggedForAdmin:{type:Boolean,default:false}, reservedUntil:Date
 }, t);
-orderSchema.index({room:1,customer:1},{unique:true});
+orderSchema.index({room:1,customer:1,paymentStatus:1});
 export const Order = model('Order', orderSchema);
 export const BulkOrder = model('BulkOrder', new Schema({
   room:{type:oid,ref:'Room',unique:true}, assignedModerator:{type:oid,ref:'User'}, customerOrders:[{type:oid,ref:'Order'}],
@@ -46,7 +46,7 @@ export const BulkOrder = model('BulkOrder', new Schema({
 export const Payment = model('Payment', new Schema({
   customer:{type:oid,ref:'User'}, order:{type:oid,ref:'Order',index:true}, provider:{type:String,default:'paystack'},
   providerReference:{type:String,unique:true}, amount:Number, commissionAmount:Number, shippingAmount:Number,
-  status:{type:String,enum:['PENDING','SUCCESS','FAILED'],default:'PENDING'}, verifiedAt:Date
+  status:{type:String,enum:['PENDING','SUCCESS','FAILED'],default:'PENDING'}, verifiedAt:Date, kind:{type:String,enum:['PRODUCT','SHIPPING'],default:'PRODUCT',index:true}, invoice:{type:oid,ref:'ShippingInvoice'}, flag:String
 }, t));
 export const Refund = model('Refund', new Schema({
   customer:{type:oid,ref:'User'}, order:{type:oid,ref:'Order',unique:true}, originalPayment:{type:oid,ref:'Payment'},
@@ -93,6 +93,13 @@ export const CompensationRule = model('CompensationRule', new Schema({ moderator
   calculationBasis:{type:String,enum:['PRODUCT_VALUE','PAID_ORDER_VALUE','FIXED_PER_ROOM']}, effectiveFrom:{type:Date,default:Date.now}, status:{type:String,enum:['ACTIVE','INACTIVE'],default:'ACTIVE'}, createdBy:{type:oid,ref:'User'} }, t));
 const crSchema = new Schema({ user:{type:oid,ref:'User'}, room:{type:oid,ref:'Room'}, lastReadAt:Date }, t); crSchema.index({user:1,room:1},{unique:true});
 export const ChatRead = model('ChatRead', crSchema);
+// Shipping is billed separately from products: one invoice per confirmed order, set by the room's moderator, paid through its own verified Payment (kind SHIPPING).
+export const ShippingInvoice = model('ShippingInvoice', new Schema({
+  invoiceNumber:{type:String,unique:true}, room:{type:oid,ref:'Room',index:true}, order:{type:oid,ref:'Order',unique:true}, customer:{type:oid,ref:'User',index:true},
+  amount:{type:Number,required:true}, status:{type:String,enum:['DRAFT','PUBLISHED','PAID','VOID'],default:'DRAFT'}, note:String, revision:{type:Number,default:0},
+  publishedAt:Date, paidAt:Date, paymentReference:String, createdBy:{type:oid,ref:'User'}, lastEditedBy:{type:oid,ref:'User'} }, t));
+export const ShippingFeeLog = model('ShippingFeeLog', new Schema({ invoice:{type:oid,ref:'ShippingInvoice',index:true}, order:{type:oid,ref:'Order'}, room:{type:oid,ref:'Room',index:true},
+  action:String, previousAmount:Number, newAmount:Number, by:{type:oid,ref:'User'}, byRole:String, note:String }, { timestamps:{createdAt:'at',updatedAt:false} }));
 export const Setting = model('Setting', new Schema({ key:{type:String,unique:true}, value:Schema.Types.Mixed }, t));
 export const AuditLog = model('AuditLog', new Schema({
   actor:{type:oid,ref:'User'}, actorRole:String, action:String, entityType:String, entityId:oid, previousValues:Object, newValues:Object, metadata:Object
