@@ -3,10 +3,11 @@
  "type": "module",
  "scripts": {
   "dev": "node --env-file=.env --watch src/server.js",
-  "start": "node src/server.js", 
+  "start": "node --env-file=.env src/server.js",
   "seed:admin": "node --env-file=.env src/seed-admin.js",
-  "test": "node --test src/",
-  "emails:preview": "node src/emails-preview.js"
+  "test": "node --test --test-concurrency=1 src/*.test.js",
+  "emails:preview": "node src/emails-preview.js",
+  "migrate:payment-first": "node --env-file=.env src/scripts/migrate-payment-first.js"
  },
  "dependencies": {
   "bcryptjs": "^2.4.3",
