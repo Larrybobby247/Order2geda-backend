@@ -28,7 +28,7 @@ async function sendPush(tokens, title, body) {
     await fcm.sendEachForMulticast({ tokens, notification: { title, body } });
   } catch (e) { console.error('push failed', e.message); }
 }
-const pathFor = (e) => (e?.kind === 'Room' ? `/app/rooms/${e.id}` : e?.kind === 'Order' ? '/app/orders' : '/app/notifications');
+const pathFor = (e) => (e?.kind === 'Room' ? `/app/rooms/${e.id}` : e?.kind === 'Order' ? '/app/orders' : e?.kind === 'Invoice' ? `/app/shipping/${e.id}` : '/app/notifications');
 export async function notify(userId, type, title, body, relatedEntity, io = _io, email = null) {
   try {
     const n = await Notification.create({ recipient: userId, type, title, body, relatedEntity, channels: ['in-app', 'email', 'push'] });
