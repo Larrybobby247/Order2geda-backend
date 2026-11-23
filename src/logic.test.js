@@ -1,0 +1,6 @@
+import test from 'node:test'; import assert from 'node:assert';
+import { hasCapacity } from './utils/capacity.js'; import { canonState, key, mapNominatim, STATES } from './utils/locations.js';
+test('capacity: a payer may start only while paid + held < threshold', () => { assert.ok(hasCapacity({ paid: 0, reserved: 0, threshold: 100 })); assert.ok(hasCapacity({ paid: 50, reserved: 49, threshold: 100 })); assert.ok(!hasCapacity({ paid: 50, reserved: 50, threshold: 100 })); assert.ok(!hasCapacity({ paid: 100, reserved: 0, threshold: 100 })); });
+test('states: 37 and canonicalised', () => { assert.equal(STATES.length, 37); assert.equal(canonState('lagos state'), 'Lagos'); assert.equal(canonState('Federal Capital Territory'), 'FCT (Abuja)'); assert.equal(canonState('abuja'), 'FCT (Abuja)'); assert.equal(canonState('Narnia'), ''); });
+test('location keys ignore case and punctuation', () => assert.equal(key('Victoria Island!'), key('victoria  island')));
+test('nominatim mapping', () => { const r = mapNominatim({ display_name: 'x', address: { state: 'Lagos', suburb: 'Ikeja', city: 'Lagos', county: 'Ikeja Local Government Area' } }); assert.equal(r.state, 'Lagos'); assert.equal(r.area, 'Ikeja'); assert.ok(r.candidates.includes('Ikeja')); assert.equal(mapNominatim({ address: { state: 'Federal Capital Territory', suburb: 'Wuse' } }).state, 'FCT (Abuja)'); });
